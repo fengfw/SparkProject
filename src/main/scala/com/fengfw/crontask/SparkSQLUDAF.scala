@@ -22,9 +22,7 @@ object SparkSQLUDAF {
 
     val hiveSqlCtx = new HiveContext(sc)
 
-    val aggregateSql=
-//     "insert overwrite table default.rpt_crontask_source partition (pday,advertiser_id) " +
-      "select partner_id,sum(total_cost) as total_cost,sum(unbid) as unbid," +
+    val aggregateSql="select partner_id,sum(total_cost) as total_cost,sum(unbid) as unbid," +
         "sum(bid) as bid,sum(imp) as imp,sum(click) as click,sum(reach) as reach,pday,phour,pyid," +
         "toextract(pytags) as pytags,client_id,campaign_division_id,sub_campaign_division_id," +
       "exe_campaign_division_id,sub_platform from rpt_effect_base " +
