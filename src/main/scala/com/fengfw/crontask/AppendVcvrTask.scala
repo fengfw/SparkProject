@@ -24,10 +24,10 @@ object AppendVcvrTask {
 
     val pday=ptime.subSequence(0,8).toString
     val phour=ptime.substring(8,10)
-    val rootPath="/user/flume/express"
+    val bidRootPath="/user/flume/express"
     val notMatch="/data/report/vcvr_notmatch"
 
-    val vcvrPath = s"/user/flume/express/pday=$pday/phour=$phour/vcvr*.lzo"
+    val vcvrPath = s"/user/root/flume/express/pday=$pday/phour=$phour/vcvr*.lzo"
     val vcvrRDD=sc.newAPIHadoopFile[LongWritable, Text, TextInputFormat](vcvrPath)
         .repartition(100)
         .map(line=> {
@@ -35,11 +35,15 @@ object AppendVcvrTask {
       val sign: String = value.split("\1", -1)(1)
       val bidUuid: String = sign.split("\2", -1)(13)
       (bidUuid, value)
-    })
+    }).persist(org.apache.spark.storage.StorageLevel.MEMORY_AND_DISK_SER)
 
-    val impBidRDD=getImpBidRDD(sc,rootPath,pday,phour,hours)
-    val outputPath=s"/data/report/append_vcvr/pday=$pday/phour=$phour"
-    val cleanOutputPath = "hdfs dfs -rmr " + outputPath+ "" !
+    val impBidRDD=getImpBidRDD(sc,bidRootPath,ptime,hours)
+      .persist(org.apache.spark.storage.StorageLevel.MEMORY_AND_DISK_SER)
+
+    val outputMatchPath=s"/data/production/report/append_vcvr/pday=$pday/phour=$phour"
+    val outputNotMatchPath=s"/data/production/report/vcvr_notmatch/pday=$pday/phour=$phour"
+    val cleanoutputMatchPath = "hdfs dfs -rmr " + outputMatchPath+ "" !
+    val cleanoutputNotMatchPath = "hdfs dfs -rmr " + outputNotMatchPath+ "" !
 
     vcvrRDD.join(impBidRDD).map(a =>{
       val vcvrBid=a._2._1+"\3"+a._2._2
@@ -47,10 +51,20 @@ object AppendVcvrTask {
     })
     .coalesce(20)
 //      .repartition(20)
-      .saveAsTextFile(outputPath)
+      .saveAsTextFile(outputMatchPath)
+
+    vcvrRDD.leftOuterJoin(impBidRDD).map(b=>{
+      var vcvr=""
+      if(b._2._2.getOrElse("").equals("")){
+        vcvr=b._2._1
+      }
+      vcvr
+    }).filter(!_.equals("")).saveAsTextFile(outputNotMatchPath)
+
     sc.stop()
   }
 
+  //将多个小时时间段的RDD合并
   def getImpBidRDD(sc:SparkContext,rootPath:String,pday:String,phour:String,hours:Int): RDD[(String, String)] ={
     val dateFormat:SimpleDateFormat=new SimpleDateFormat("yyyyMMddHH")
     var time=dateFormat.parse(pday+phour)
@@ -71,6 +85,7 @@ object AppendVcvrTask {
     impBidRDD
   }
 
+  //将指定目录下文件生成（key，value）形式RDD
   def getFileRDD(sc:SparkContext,rootPath:String): RDD[(String, String)] ={
     val fileRDD=sc.newAPIHadoopFile[LongWritable, Text, TextInputFormat](rootPath)
 //      .repartition(20) //减少重分区，可提升计算性能
