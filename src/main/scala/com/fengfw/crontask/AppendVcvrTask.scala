@@ -80,7 +80,7 @@ object AppendVcvrTask {
     val impBidRDD = getFileRDD(sc, pathList(0))
     pathList.remove(0)
     for(path <- pathList){
-      impBidRDD.union(getFileRDD(sc,path))
+      impBidRDD=impBidRDD.union(getFileRDD(sc,path))
     }
     impBidRDD
   }
