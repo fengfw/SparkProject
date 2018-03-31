@@ -37,7 +37,7 @@ object AppendVcvrTask {
       (bidUuid, value)
     }).persist(org.apache.spark.storage.StorageLevel.MEMORY_AND_DISK_SER)
 
-    val vcvrID=vcvrRDD.map(a=>(a._1,"")).collect()
+    val vcvrID=vcvrRDD.map(a=>(a._1,"")).collectAsMap()
     val broadcast=sc.broadcast(vcvrID)
 
     val impBidRDD=getImpBidRDD(sc,bidRootPath,ptime,hours,broadcast)
